@@ -20,6 +20,7 @@ using UnityEngine.XR.WSA.Input;
 using System.Threading;
 using Microsoft.MixedReality.Toolkit.Experimental.Utilities;
 
+using TMPro;
 
 // App permissions, modify the appx file for research mode streams
 // https://docs.microsoft.com/en-us/windows/uwp/packaging/app-capability-declarations
@@ -56,16 +57,27 @@ namespace ArUcoDetectionHoloLensUnity
         /// <summary>
         /// Game object for to use for marker instantiation
         /// </summary>
-        public GameObject markerGo;
+        public GameObject markerWrist;
+        public GameObject markerElbow;
+        public GameObject markerShoulder;
 
         /// <summary>
         /// List of prefab instances of detected aruco markers.
         /// </summary>
-        //private List<GameObject> _markerGOs;
+        //private List<GameObject> _markerGOs; - might need to do this instead for the private list of game objects instead of having 3 public 
+                                                /// game object variables.
 
         private bool _mediaFrameSourceGroupsStarted = false;
         private int _frameCount = 0;
-        public int skipFrames = 3;
+        public int skipFrames = 1; // previously 3
+        public int MarkerIDWrist = 0;
+        public int MarkerIDElbow = 1;
+        public int MarkerIDShoulder = 2;
+        //public GameObject MarkerText;
+
+        public TextMeshPro MarkerTextWrist;
+        public TextMeshPro MarkerTextElbow;
+        public TextMeshPro MarkerTextShoulder;
 
 #if ENABLE_WINMD_SUPPORT
         // Enable winmd support to include winmd files. Will not
@@ -111,7 +123,9 @@ namespace ArUcoDetectionHoloLensUnity
             // HoloLens media frame source groups.
             StartCoroutine(DelayCoroutine());
 
-            markerGo.transform.localScale = new Vector3(markerSize, markerSize, markerSize);
+            markerWrist.transform.localScale = new Vector3(markerSize, markerSize, markerSize);
+            markerElbow.transform.localScale = new Vector3(markerSize, markerSize, markerSize);
+            markerShoulder.transform.localScale = new Vector3(markerSize, markerSize, markerSize);
         }
 
         /// <summary>
@@ -136,12 +150,16 @@ namespace ArUcoDetectionHoloLensUnity
 #if ENABLE_WINMD_SUPPORT
             _frameCount += 1;
 
-            // Predict every 3rd frame
+            // Predict every 3rd frame - changed to first
             if (_frameCount == skipFrames)
             {
+                // Potentially this is where I will need to look for 3 ArUco markers instead of just the one. Var declares local 
+                // variables without giving them explicit types, therefore not 100% sure what detections is.
+                // wait until the task is completed => task being completed - using the type of sensor stream detect
+                // the markers with openCV
                 var detections = await Task.Run(() => _pvMediaFrameSourceGroup.DetectArUcoMarkers(_sensorType));
 
-                // Update the game object pose with current detections
+                // Update the game object pose with current detections - this will have to be 3 seperate game objects/ their poses.
                 UpdateArUcoDetections(detections);
 
                 _frameCount = 0;
@@ -230,7 +248,7 @@ namespace ArUcoDetectionHoloLensUnity
         }
 
         // Get the latest frame from hololens media
-        // frame source group -- not needed
+        // frame source group -- not needed; I didnt add in this comment
 #if ENABLE_WINMD_SUPPORT           
         void UpdateArUcoDetections(IList<DetectedArUcoMarker> detections)
         {
@@ -242,18 +260,22 @@ namespace ArUcoDetectionHoloLensUnity
 
             // Detect ArUco markers in current frame
             // https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#void%20Rodrigues(InputArray%20src,%20OutputArray%20dst,%20OutputArray%20jacobian)
-            //IList<DetectedArUcoMarker> detectedArUcoMarkers = _pvMediaFrameSourceGroup.GetArUcoDetections();
-            //_pvMediaFrameSourceGroup.DetectArUcoMarkers(_sensorType);
+            // THIS WAS COMMENTED OUT BELOW
+            
+            // IList<DetectedArUcoMarker> detectedArUcoMarkers = _pvMediaFrameSourceGroup.GetArUcoDetections();
+            // _pvMediaFrameSourceGroup.DetectArUcoMarkers(_sensorType);
 
+
+            // THIS WAS detections.Count !=0
             // If we detect a marker, display
-            if (detections.Count != 0)
+            if (detections.Count == 3)
             {
                 // Remove world anchor from game object
                 if (_isWorldAnchored)
                 {
                     try
                     {
-                        DestroyImmediate(markerGo.GetComponent<WorldAnchor>());
+                        DestroyImmediate(markerWrist.GetComponent<WorldAnchor>());
                         _isWorldAnchored = false;
                     }
                     catch (Exception)
@@ -261,11 +283,14 @@ namespace ArUcoDetectionHoloLensUnity
                         throw;
                     }
                 }
-
-                foreach (var detectedMarker in detections)
+            
+                // COMMENTED OUT the foreach loop
+                /*foreach (var detectedMarker in detections)
                 {
                     // Get pose from OpenCV and format for Unity
                     Vector3 position = CvUtils.Vec3FromFloat3(detectedMarker.Position);
+                    MarkerIDWrist = detectedMarker.Id;
+                    MarkerTextWrist.SetText(MarkerIDWrist.ToString());
                     position.y *= -1f;
                     Quaternion rotation = CvUtils.RotationQuatFromRodrigues(CvUtils.Vec3FromFloat3(detectedMarker.Rotation));
                     Matrix4x4 cameraToWorldUnity = CvUtils.Mat4x4FromFloat4x4(detectedMarker.CameraToWorldUnity);
@@ -275,16 +300,70 @@ namespace ArUcoDetectionHoloLensUnity
                     Matrix4x4 transformUnityWorld = cameraToWorldUnity * transformUnityCamera;
 
                     // Apply updated transform to gameobject in world
-                    markerGo.transform.SetPositionAndRotation(
+                    markerWrist.transform.SetPositionAndRotation(
                         CvUtils.GetVectorFromMatrix(transformUnityWorld),
                         CvUtils.GetQuatFromMatrix(transformUnityWorld));
-                }
+                } */
+
+                //// HARDCODED to try and track all 3 ArUco markers instead of 1. THis is effectively the same as a for loop with 
+                /// naming being slightly easier for now - will change.
+                // Get pose from OpenCV and format for Unity
+                Vector3 position1 = CvUtils.Vec3FromFloat3(detections[0].Position);
+                Vector3 position2 = CvUtils.Vec3FromFloat3(detections[1].Position);
+                Vector3 position3 = CvUtils.Vec3FromFloat3(detections[2].Position);
+                MarkerIDWrist = detections[0].Id;
+                MarkerTextWrist.SetText(MarkerIDWrist.ToString());
+                MarkerIDElbow = detections[1].Id;
+                MarkerTextElbow.SetText(MarkerIDElbow.ToString());
+                MarkerIDShoulder = detections[2].Id;
+                MarkerTextShoulder.SetText(MarkerIDShoulder.ToString());
+                position1.y *= -1f;
+                position2.y *= -1f;
+                position3.y *= -1f;
+
+                Quaternion rotation1 = CvUtils.RotationQuatFromRodrigues(CvUtils.Vec3FromFloat3(detections[0].Rotation));
+                Matrix4x4 cameraToWorldUnity1 = CvUtils.Mat4x4FromFloat4x4(detections[0].CameraToWorldUnity);
+                Matrix4x4 transformUnityCamera1 = CvUtils.TransformInUnitySpace(position1, rotation1);
+
+                // Use camera to world transform to get world pose of marker
+                Matrix4x4 transformUnityWorld1 = cameraToWorldUnity1 * transformUnityCamera1;
+
+                // Apply updated transform to gameobject in world
+                markerWrist.transform.SetPositionAndRotation(
+                    CvUtils.GetVectorFromMatrix(transformUnityWorld1),
+                    CvUtils.GetQuatFromMatrix(transformUnityWorld1));
+
+                Quaternion rotation2 = CvUtils.RotationQuatFromRodrigues(CvUtils.Vec3FromFloat3(detections[1].Rotation));
+                Matrix4x4 cameraToWorldUnity2 = CvUtils.Mat4x4FromFloat4x4(detections[1].CameraToWorldUnity);
+                Matrix4x4 transformUnityCamera2 = CvUtils.TransformInUnitySpace(position2, rotation2);
+
+                // Use camera to world transform to get world pose of marker
+                Matrix4x4 transformUnityWorld2 = cameraToWorldUnity2 * transformUnityCamera2;
+
+                // Apply updated transform to gameobject in world
+                markerWrist.transform.SetPositionAndRotation(
+                    CvUtils.GetVectorFromMatrix(transformUnityWorld2),
+                    CvUtils.GetQuatFromMatrix(transformUnityWorld2));
+
+
+                Quaternion rotation3 = CvUtils.RotationQuatFromRodrigues(CvUtils.Vec3FromFloat3(detections[2].Rotation));
+                Matrix4x4 cameraToWorldUnity3 = CvUtils.Mat4x4FromFloat4x4(detections[2].CameraToWorldUnity);
+                Matrix4x4 transformUnityCamera3 = CvUtils.TransformInUnitySpace(position3, rotation3);
+
+                // Use camera to world transform to get world pose of marker
+                Matrix4x4 transformUnityWorld3 = cameraToWorldUnity3 * transformUnityCamera3;
+
+                // Apply updated transform to gameobject in world
+                markerWrist.transform.SetPositionAndRotation(
+                    CvUtils.GetVectorFromMatrix(transformUnityWorld3),
+                    CvUtils.GetQuatFromMatrix(transformUnityWorld3));
             }
-            // If no markers in scene, anchor marker go to last position
+            // If no markers in scene, anchor marker go to last position - not 100% sure what this does. May need to add seperate world
+            // anchors to each markerJoints.
             else
             {
                 // Add a world anchor to the attached gameobject
-                markerGo.AddComponent<WorldAnchor>();
+                markerWrist.AddComponent<WorldAnchor>();
                 _isWorldAnchored = true;
             }
             myText.text = "Began streaming sensor frames. Double tap to end streaming.";
